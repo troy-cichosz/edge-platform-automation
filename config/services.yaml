@@ -1,20 +1,29 @@
+defaults:
+  ado_project: Docker
+  development_branch: chatgpt
+
 services:
   edge-controller:
     repository: troy-cichosz/edge-controller
-    development_branch: chatgpt
+    ado_repository: edge-controller
+    ado_pipeline: edge-controller - CI
 
   edge-time:
     repository: troy-cichosz/edge-time
-    development_branch: chatgpt
+    ado_repository: edge-time
+    ado_pipeline: edge-time - CI
 
   edge-gps:
     repository: troy-cichosz/edge-gps
-    development_branch: chatgpt
+    ado_repository: edge-gps
+    ado_pipeline: edge-gps - CI
 
   edge-video:
     repository: troy-cichosz/edge-video
-    development_branch: chatgpt
+    ado_repository: edge-video
+    ado_pipeline: edge-video - CI
 
   edge-audio:
     repository: troy-cichosz/edge-audio
-    development_branch: chatgpt
+    ado_repository: edge-audio
+    ado_pipeline: edge-audio - CI
