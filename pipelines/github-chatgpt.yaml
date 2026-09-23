@@ -156,8 +156,13 @@ jobs:
             SOURCE_PATH="$(Pipeline.Workspace)/github-source"
             ADO_PATH="$(Pipeline.Workspace)/ado-$SERVICE_NAME"
 
+            # Use Git's --config-env form so the OAuth header is supplied to Git
+            # without embedding the token in the command line.
+            export ADO_AUTH_HEADER="Authorization: Bearer $SYSTEM_ACCESSTOKEN"
+            export GIT_TERMINAL_PROMPT=0
+
             rm -rf "$ADO_PATH"
-            git -c http.extraheader="AUTHORIZATION: bearer $SYSTEM_ACCESSTOKEN" clone "$ADO_REPOSITORY_URL" "$ADO_PATH"
+            git --config-env=http.extraheader=ADO_AUTH_HEADER clone "$ADO_REPOSITORY_URL" "$ADO_PATH"
             cd "$ADO_PATH"
             git fetch origin --prune
 
@@ -184,7 +189,7 @@ jobs:
 
             git commit -m "Synchronize $SERVICE_NAME from GitHub chatgpt $GITHUB_SHA"
             ADO_SHA=`git rev-parse HEAD`
-            git -c http.extraheader="AUTHORIZATION: bearer $SYSTEM_ACCESSTOKEN" push origin "HEAD:refs/heads/$ADO_BRANCH"
+            git --config-env=http.extraheader=ADO_AUTH_HEADER push origin "HEAD:refs/heads/$ADO_BRANCH"
             echo "GitHub SHA: $GITHUB_SHA"
             echo "ADO SHA:    $ADO_SHA"
             echo "##vso[task.setvariable variable=ADO_SYNC_CHANGED]true"
