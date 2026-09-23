@@ -2,12 +2,12 @@
 
 Automation control plane for the AI Legal Platform.
 
-GitHub is the authoritative source for automation code. The `chatgpt` branch is the development branch used during implementation and vetting. Azure DevOps Server consumes the vetted automation repository to orchestrate the existing service CI/CD system.
+GitHub is the authoritative source for automation code. The `chatgpt` branch is the development branch used during implementation and vetting. Azure DevOps Server consumes the vetted automation repository to orchestrate source synchronization and the existing service CI/CD system.
 
 ## Current workflow
 
 ```
-GitHub service/chatgpt
+GitHub repository/chatgpt
         |
         v
 GitHub webhook
@@ -16,52 +16,62 @@ GitHub webhook
 edge-platform-automation - CI
         |
         +--> identify repository/ref/SHA
-        +--> retrieve GitHub chatgpt source
-        +--> synchronize matching ADO service/chatgpt
+        +--> retrieve exact GitHub chatgpt source
+        +--> synchronize matching ADO repository/chatgpt
         +--> create ADO synchronization commit
-        +--> push ADO chatgpt
         |
-        v
-existing edge-<service> - CI/CD
+        +--> build_service: existing service CI/CD
         |
-        +--> existing build / scan / registry / deployment
-        +--> existing release behavior
+        +--> sync_only: sync-only public-maintenance pipeline
         |
         v
 GitHub public
 ```
 
-GitHub service `chatgpt` is authoritative for source and history.
+GitHub `chatgpt` is authoritative for source and history. ADO `chatgpt` branches are operational mirrors.
 
-ADO service `chatgpt` is an operational build-triggering mirror. Its commit history does not need to match GitHub. Synchronization replaces the ADO working tree with the GitHub source tree so files deleted in GitHub are also absent in ADO.
+## Repository classes
 
-The existing service pipelines are intentionally not modified by this automation increment.
+The automation registry covers all seven current project repositories:
 
-## Proven webhook behavior
+| Repository | Class | Downstream behavior |
+|---|---|---|
+| `edge-controller` | `build_service` | Existing service CI/CD |
+| `edge-time` | `build_service` | Existing service CI/CD |
+| `edge-gps` | `build_service` | Existing service CI/CD |
+| `edge-video` | `build_service` | Existing service CI/CD |
+| `edge-audio` | `build_service` | Existing service CI/CD |
+| `ai-legal-platform-development` | `sync_only` | Public-maintenance pipeline |
+| `edge-platform-automation` | `sync_only` | Public-maintenance pipeline |
 
-The GitHub-to-ADO webhook, repository identification, `chatgpt` branch validation, SSH authentication, strict GitHub host-key verification, and exact GitHub SHA checkout/verification have been proven with the `edge-gps` pilot.
+Synchronization is complete-tree: files deleted from GitHub `chatgpt` are removed from the ADO mirror.
 
-The current implementation adds the ADO service-repository synchronization step.
+## Proven synchronization behavior
+
+The GitHub-to-ADO webhook, repository identification, `chatgpt` branch validation, SSH authentication, strict GitHub host-key verification, exact GitHub SHA checkout/verification, ADO synchronization commit, and remote ADO SHA verification were proven with the `edge-gps` pilot.
+
+Increment C extends that mechanism to the full repository registry.
+
+Build-service synchronization now has a preflight check for the required existing `azure-pipelines.yaml` before complete-tree replacement. This protects the existing service CI trigger definition from accidental deletion.
+
+Non-`chatgpt` GitHub webhook events remain harmless no-ops.
 
 ## Synchronization responsibility
 
-This repository orchestrates source movement only.
+This repository orchestrates source movement and repository classification.
 
 It does not:
 
 - build service Docker images;
-- replace the existing service CI pipelines;
+- replace existing service CI pipelines;
 - deploy service containers directly;
-- modify GitHub service `public` branches.
+- push GitHub `public` directly.
 
-It does:
+For `build_service` repositories, the synchronized ADO `chatgpt` branch continues into the existing service CI/CD.
 
-- identify the affected service;
-- retrieve its GitHub `chatgpt` source;
-- synchronize the source tree into the matching ADO service repository;
-- create the ADO synchronization commit;
-- push the ADO `chatgpt` branch;
-- record the GitHub revision and resulting ADO revision for correlation.
+For `sync_only` repositories, the synchronized ADO `chatgpt` branch triggers the repository's `chatgpt-pipelines.yaml` public-maintenance pipeline. That downstream pipeline performs the existing-style ADO-to-GitHub `public` maintenance operation.
+
+The `edge-platform-automation` public push can generate another GitHub webhook event, but the automation pipeline accepts only `chatgpt` events. This is the explicit recursion boundary.
 
 ## Security
 
@@ -72,24 +82,22 @@ It does:
 - Secrets and credentials must never be committed to this repository.
 - OAuth tokens and other credentials must never be echoed to logs.
 
-## Promotion
+## Current increment
 
-Public promotion is not an automation-repository responsibility.
+**Increment C — Expand and harden GitHub → ADO synchronization**
 
-The existing service CI/CD may continue its current `public` behavior while the migration is being verified. A later increment will define and test the long-term promotion mechanism.
+Implementation has been added on `chatgpt`. Runtime/ADO verification remains required before marking the increment complete.
 
-## Next increment
+Next verification should cover:
 
-**Increment B — GitHub → ADO service-repository synchronization**
+1. ADO mirrors for all seven repositories.
+2. A controlled `chatgpt` push for each repository.
+3. Existing service CI triggers for all five build services.
+4. Sync-only public maintenance for both control-plane repositories.
+5. Complete-tree deletion propagation.
+6. Idempotent synchronization.
+7. Non-`chatgpt` no-op behavior.
+8. `edge-platform-automation` recursion boundary.
+9. GitHub SHA → ADO synchronization SHA correlation.
 
-Pilot: `edge-gps`.
-
-Acceptance:
-
-- GitHub `edge-gps/chatgpt` push reaches automation.
-- Automation pulls the GitHub source.
-- Matching ADO `edge-gps/chatgpt` is updated.
-- Deleted GitHub files are removed from ADO.
-- ADO synchronization commit is pushed.
-- Existing `edge-gps - CI` triggers from the ADO branch change.
-- Existing service CI/CD remains unchanged.
+Existing service CI/CD definitions remain unchanged.
