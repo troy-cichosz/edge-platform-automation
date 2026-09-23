@@ -42,20 +42,20 @@ jobs:
 
       - task: Bash@3
         displayName: 'Validate GitHub Push'
-        env:
-          GITHUB_REPOSITORY: ${{ parameters.GitHubPush.repository.full_name }}
-          GITHUB_REF: ${{ parameters.GitHubPush.ref }}
-          GITHUB_SHA: ${{ parameters.GitHubPush.after }}
         inputs:
           targetType: inline
           script: |
             set -euo pipefail
-            echo "Repository: $GITHUB_REPOSITORY"
-            echo "Ref:        $GITHUB_REF"
-            echo "SHA:        $GITHUB_SHA"
-            if [ -z "$GITHUB_REPOSITORY" ]; then echo "ERROR: GitHub repository was not supplied by the webhook."; exit 1; fi
-            if [ -z "$GITHUB_REF" ]; then echo "ERROR: GitHub ref was not supplied by the webhook."; exit 1; fi
-            if [ -z "$GITHUB_SHA" ]; then echo "ERROR: GitHub commit SHA was not supplied by the webhook."; exit 1; fi
+
+            GITHUB_REPOSITORY='${{ parameters.GitHubPush.repository.full_name }}'
+            GITHUB_REF='${{ parameters.GitHubPush.ref }}'
+            GITHUB_SHA='${{ parameters.GitHubPush.after }}'
+
+            if [ -z "$GITHUB_REPOSITORY" ] || [ -z "$GITHUB_REF" ] || [ -z "$GITHUB_SHA" ]; then
+              echo "ERROR: GitHub repository, ref, and SHA are required."
+              exit 1
+            fi
+
             case "$GITHUB_REPOSITORY" in
               troy-cichosz/edge-controller) SERVICE_NAME="edge-controller" ;;
               troy-cichosz/edge-time) SERVICE_NAME="edge-time" ;;
@@ -64,7 +64,12 @@ jobs:
               troy-cichosz/edge-audio) SERVICE_NAME="edge-audio" ;;
               *) echo "ERROR: Unsupported GitHub repository: $GITHUB_REPOSITORY"; exit 1 ;;
             esac
-            if [ "$GITHUB_REF" != "refs/heads/chatgpt" ]; then echo "ERROR: Unsupported GitHub ref: $GITHUB_REF"; exit 1; fi
+
+            if [ "$GITHUB_REF" != "refs/heads/chatgpt" ]; then
+              echo "ERROR: Unsupported GitHub ref: $GITHUB_REF"
+              exit 1
+            fi
+
             echo "Service: $SERVICE_NAME"
             echo "##vso[task.setvariable variable=SERVICE_NAME]$SERVICE_NAME"
             echo "##vso[task.setvariable variable=GITHUB_REPOSITORY]$GITHUB_REPOSITORY"
@@ -72,7 +77,7 @@ jobs:
             echo "##vso[task.setvariable variable=GITHUB_SHA]$GITHUB_SHA"
 
       - task: Bash@3
-        displayName: 'Fetch Exact GitHub Revision'
+        displayName: 'Fetch Exact GitHub ChatGPT Source'
         env:
           GITHUB_REPOSITORY: $(GITHUB_REPOSITORY)
           GITHUB_REF: $(GITHUB_REF)
@@ -82,48 +87,98 @@ jobs:
           script: |
             set -euo pipefail
             WORKSPACE="$(Pipeline.Workspace)/github-source"
-            SSH_DIR="${HOME}/.ssh"
-            KNOWN_HOSTS="${SSH_DIR}/github_known_hosts"
+            SSH_DIR="$HOME/.ssh"
+            KNOWN_HOSTS="$SSH_DIR/github_known_hosts"
             rm -rf "$WORKSPACE"
             mkdir -p "$WORKSPACE" "$SSH_DIR"
             cat > "$KNOWN_HOSTS" <<'EOF'
             github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
             EOF
             chmod 600 "$KNOWN_HOSTS"
-            export GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=${KNOWN_HOSTS} -o StrictHostKeyChecking=yes"
-            git clone --no-tags "git@github.com:${GITHUB_REPOSITORY}.git" "$WORKSPACE"
+            export GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=$KNOWN_HOSTS -o StrictHostKeyChecking=yes"
+            git clone --no-tags "git@github.com:$GITHUB_REPOSITORY.git" "$WORKSPACE"
             cd "$WORKSPACE"
-            git fetch --no-tags origin "${GITHUB_REF}:refs/remotes/origin/chatgpt"
+            git fetch --no-tags origin "$GITHUB_REF:refs/remotes/origin/chatgpt"
             git checkout --detach "$GITHUB_SHA"
             ACTUAL_SHA="$(git rev-parse HEAD)"
-            echo "Expected SHA: $GITHUB_SHA"
-            echo "Actual SHA:   $ACTUAL_SHA"
-            if [ "$ACTUAL_SHA" != "$GITHUB_SHA" ]; then echo "ERROR: Checked-out revision does not match webhook SHA."; exit 1; fi
-            echo "GitHub revision verified successfully."
-            echo "##vso[task.setvariable variable=GITHUB_SOURCE_PATH]$WORKSPACE"
+            if [ "$ACTUAL_SHA" != "$GITHUB_SHA" ]; then
+              echo "ERROR: Checked-out GitHub revision does not match webhook SHA."
+              exit 1
+            fi
 
       - task: Bash@3
-        displayName: 'Record Revision Verification'
+        displayName: 'Synchronize Matching ADO Repository'
         env:
-          GITHUB_REPOSITORY: $(GITHUB_REPOSITORY)
-          GITHUB_REF: $(GITHUB_REF)
           GITHUB_SHA: $(GITHUB_SHA)
-          GITHUB_SOURCE_PATH: $(GITHUB_SOURCE_PATH)
           SERVICE_NAME: $(SERVICE_NAME)
+          SYSTEM_ACCESSTOKEN: $(System.AccessToken)
         inputs:
           targetType: inline
           script: |
             set -euo pipefail
-            echo "GitHub revision verification complete."
-            echo "Service:     $SERVICE_NAME"
-            echo "Repository:  $GITHUB_REPOSITORY"
-            echo "Ref:         $GITHUB_REF"
-            echo "SHA:         $GITHUB_SHA"
-            echo "Source path: $GITHUB_SOURCE_PATH"
+            if [ -z "$SYSTEM_ACCESSTOKEN" ]; then
+              echo "ERROR: System.AccessToken is not available."
+              exit 1
+            fi
 
-      - task: PublishBuildArtifacts@1
-        displayName: 'Publish Verified GitHub Source'
+            ADO_PROJECT="Docker"
+            ADO_REPOSITORY="$SERVICE_NAME"
+            ADO_BRANCH="chatgpt"
+            ADO_REPOSITORY_URL="$(System.TeamFoundationCollectionUri)$ADO_PROJECT/_git/$ADO_REPOSITORY"
+            SOURCE_PATH="$(Pipeline.Workspace)/github-source"
+            ADO_PATH="$(Pipeline.Workspace)/ado-$SERVICE_NAME"
+
+            rm -rf "$ADO_PATH"
+            git -c http.extraheader="AUTHORIZATION: bearer $SYSTEM_ACCESSTOKEN" clone "$ADO_REPOSITORY_URL" "$ADO_PATH"
+            cd "$ADO_PATH"
+            git fetch origin --prune
+
+            if git show-ref --verify --quiet "refs/remotes/origin/$ADO_BRANCH"; then
+              git checkout -B "$ADO_BRANCH" "origin/$ADO_BRANCH"
+            else
+              git checkout --orphan "$ADO_BRANCH"
+              git rm -rf . >/dev/null 2>&1 || true
+            fi
+
+            find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+            cp -a "$SOURCE_PATH"/. "$ADO_PATH"/
+            git config user.name "edge-platform-automation"
+            git config user.email "edge-platform-automation@spoocannon.com"
+            git add --all
+
+            if git diff --cached --quiet; then
+              echo "ADO working tree already matches GitHub source."
+              echo "##vso[task.setvariable variable=ADO_SYNC_CHANGED]false"
+              echo "##vso[task.setvariable variable=ADO_SYNC_SHA]$(git rev-parse HEAD)"
+              exit 0
+            fi
+
+            git commit -m "Synchronize $SERVICE_NAME from GitHub chatgpt $GITHUB_SHA"
+            ADO_SHA="$(git rev-parse HEAD)"
+            git -c http.extraheader="AUTHORIZATION: bearer $SYSTEM_ACCESSTOKEN" push origin "HEAD:refs/heads/$ADO_BRANCH"
+            echo "GitHub SHA: $GITHUB_SHA"
+            echo "ADO SHA:    $ADO_SHA"
+            echo "##vso[task.setvariable variable=ADO_SYNC_CHANGED]true"
+            echo "##vso[task.setvariable variable=ADO_SYNC_SHA]$ADO_SHA"
+
+      - task: Bash@3
+        displayName: 'Record Synchronization Result'
+        env:
+          GITHUB_REPOSITORY: $(GITHUB_REPOSITORY)
+          GITHUB_SHA: $(GITHUB_SHA)
+          SERVICE_NAME: $(SERVICE_NAME)
+          ADO_SYNC_CHANGED: $(ADO_SYNC_CHANGED)
+          ADO_SYNC_SHA: $(ADO_SYNC_SHA)
         inputs:
-          PathtoPublish: '$(GITHUB_SOURCE_PATH)'
-          ArtifactName: 'github-source'
-          publishLocation: 'Container'
+          targetType: inline
+          script: |
+            set -euo pipefail
+            echo "GitHub repository: $GITHUB_REPOSITORY"
+            echo "GitHub branch:     chatgpt"
+            echo "GitHub SHA:        $GITHUB_SHA"
+            echo "ADO project:       Docker"
+            echo "ADO repository:    $SERVICE_NAME"
+            echo "ADO branch:        chatgpt"
+            echo "ADO changed:       $ADO_SYNC_CHANGED"
+            echo "ADO sync SHA:      $ADO_SYNC_SHA"
+            echo "Synchronization stage complete."
