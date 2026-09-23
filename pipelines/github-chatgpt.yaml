@@ -204,7 +204,12 @@ jobs:
             fi
 
             find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-            cp -a "$SOURCE_PATH"/. "$ADO_PATH"/
+
+            # Copy the GitHub source tree without copying its .git directory.
+            # The destination .git must remain the authenticated ADO repository
+            # so the synchronization commit is created and pushed to ADO.
+            find "$SOURCE_PATH" -mindepth 1 -maxdepth 1 ! -name .git -exec cp -a {} "$ADO_PATH"/ \;
+
             git config user.name "edge-platform-automation"
             git config user.email "edge-platform-automation@spoocannon.com"
             git add --all
@@ -220,8 +225,18 @@ jobs:
             git commit -m "Synchronize $SERVICE_NAME from GitHub chatgpt $GITHUB_SHA"
             ADO_SHA=`git rev-parse HEAD`
             git push origin "HEAD:refs/heads/$ADO_BRANCH"
-            echo "GitHub SHA: $GITHUB_SHA"
-            echo "ADO SHA:    $ADO_SHA"
+
+            REMOTE_ADO_SHA=`git ls-remote origin "refs/heads/$ADO_BRANCH" | cut -f1`
+            if [ "$REMOTE_ADO_SHA" != "$ADO_SHA" ]; then
+              echo "ERROR: ADO branch verification failed."
+              echo "Expected ADO SHA: $ADO_SHA"
+              echo "Remote ADO SHA:   $REMOTE_ADO_SHA"
+              exit 1
+            fi
+
+            echo "GitHub SHA:       $GITHUB_SHA"
+            echo "ADO SHA:          $ADO_SHA"
+            echo "Verified ADO SHA: $REMOTE_ADO_SHA"
             echo "##vso[task.setvariable variable=ADO_SYNC_CHANGED]true"
             echo "##vso[task.setvariable variable=ADO_SYNC_SHA]$ADO_SHA"
 
