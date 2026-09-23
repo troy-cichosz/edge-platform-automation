@@ -98,19 +98,28 @@ jobs:
               *) echo "ERROR: Unsupported GitHub repository: $GITHUB_REPOSITORY"; exit 1 ;;
             esac
 
-            if [ "$GITHUB_REF" != "refs/heads/chatgpt" ]; then
-              echo "ERROR: Unsupported GitHub ref: $GITHUB_REF"
-              exit 1
-            fi
+            echo "GitHub repository: $GITHUB_REPOSITORY"
+            echo "GitHub ref:        $GITHUB_REF"
+            echo "GitHub SHA:        $GITHUB_SHA"
 
-            echo "Service: $SERVICE_NAME"
-            echo "##vso[task.setvariable variable=SERVICE_NAME]$SERVICE_NAME"
             echo "##vso[task.setvariable variable=GITHUB_REPOSITORY]$GITHUB_REPOSITORY"
             echo "##vso[task.setvariable variable=GITHUB_REF]$GITHUB_REF"
             echo "##vso[task.setvariable variable=GITHUB_SHA]$GITHUB_SHA"
 
+            if [ "$GITHUB_REF" != "refs/heads/chatgpt" ]; then
+              echo "Ignoring GitHub push because this automation only synchronizes the chatgpt branch."
+              echo "No ADO repository will be modified."
+              echo "##vso[task.setvariable variable=GITHUB_PUSH_ACCEPTED]false"
+              exit 0
+            fi
+
+            echo "Accepted GitHub chatgpt push for service: $SERVICE_NAME"
+            echo "##vso[task.setvariable variable=SERVICE_NAME]$SERVICE_NAME"
+            echo "##vso[task.setvariable variable=GITHUB_PUSH_ACCEPTED]true"
+
       - task: Bash@3
         displayName: 'Fetch Exact GitHub ChatGPT Source'
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'))
         env:
           GITHUB_REPOSITORY: $(GITHUB_REPOSITORY)
           GITHUB_REF: $(GITHUB_REF)
@@ -144,38 +153,39 @@ jobs:
         path: ado-edge-controller
         clean: true
         persistCredentials: true
-        condition: and(succeeded(), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-controller'))
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-controller'))
 
       - checkout: edgeTime
         displayName: 'Checkout ADO edge-time chatgpt'
         path: ado-edge-time
         clean: true
         persistCredentials: true
-        condition: and(succeeded(), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-time'))
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-time'))
 
       - checkout: edgeGps
         displayName: 'Checkout ADO edge-gps chatgpt'
         path: ado-edge-gps
         clean: true
         persistCredentials: true
-        condition: and(succeeded(), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-gps'))
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-gps'))
 
       - checkout: edgeVideo
         displayName: 'Checkout ADO edge-video chatgpt'
         path: ado-edge-video
         clean: true
         persistCredentials: true
-        condition: and(succeeded(), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-video'))
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-video'))
 
       - checkout: edgeAudio
         displayName: 'Checkout ADO edge-audio chatgpt'
         path: ado-edge-audio
         clean: true
         persistCredentials: true
-        condition: and(succeeded(), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-audio'))
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-audio'))
 
       - task: Bash@3
         displayName: 'Synchronize Matching ADO Repository'
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'))
         env:
           GITHUB_SHA: $(GITHUB_SHA)
           SERVICE_NAME: $(SERVICE_NAME)
@@ -242,6 +252,7 @@ jobs:
 
       - task: Bash@3
         displayName: 'Record Synchronization Result'
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'))
         env:
           GITHUB_REPOSITORY: $(GITHUB_REPOSITORY)
           GITHUB_SHA: $(GITHUB_SHA)
