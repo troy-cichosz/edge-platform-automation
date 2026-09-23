@@ -1,0 +1,67 @@
+trigger:
+  - chatgpt
+
+pr: none
+
+pool:
+  name: Linux x86 64bit
+
+variables:
+  - group: GitHub
+  - name: PUBLIC_BRANCH
+    value: public
+
+steps:
+  - checkout: self
+    clean: true
+
+  - task: Bash@3
+    displayName: 'Prepare Public Repository Tree'
+    inputs:
+      targetType: inline
+      script: |
+        set -euo pipefail
+
+        SOURCE_DIR="$(Build.SourcesDirectory)"
+        SNAPSHOT_DIR="$(Pipeline.Workspace)/public-snapshot"
+
+        rm -rf "$SNAPSHOT_DIR"
+        mkdir -p "$SNAPSHOT_DIR"
+
+        cd "$SOURCE_DIR"
+        git archive HEAD | tar -x -C "$SNAPSHOT_DIR"
+
+        git checkout --orphan "$(PUBLIC_BRANCH)"
+        find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} \;
+
+        find "$SNAPSHOT_DIR" -mindepth 1 -maxdepth 1 ! -name .git ! -name chatgpt-pipelines.yaml -exec cp -a {} "$SOURCE_DIR"/ \;
+
+        git config user.name "$(gitUID)"
+        git config user.email "$(gitUID)@users.noreply.github.com"
+        git add --all
+
+        if git diff --cached --quiet; then
+          echo "No public-tree changes detected."
+          exit 0
+        fi
+
+        git commit -m "Synchronize public from chatgpt $(Build.SourceVersion)"
+
+  - task: InstallSSHKey@0
+    displayName: 'Install GitHub SSH Key'
+    inputs:
+      knownHostsEntry: '$(known_hosts_entry)'
+      sshPublicKey: '$(git_pk)'
+      sshKeySecureFile: '$(secFile)'
+
+  - task: Bash@3
+    displayName: 'Push Public GitHub Branch'
+    inputs:
+      targetType: inline
+      script: |
+        set -euo pipefail
+
+        ssh-keyscan -t $(keyID) github.com >> ~/.ssh/known_hosts
+
+        git push "git@github.com:$(gitUID)/$(repoName).git"           HEAD:refs/heads/$(PUBLIC_BRANCH)           --force           --tags
+    workingDirectory: $(Build.SourcesDirectory)
