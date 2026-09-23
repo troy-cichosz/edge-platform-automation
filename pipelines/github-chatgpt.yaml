@@ -13,8 +13,8 @@ variables:
   - group: GitHub
 
 jobs:
-  - job: IdentifyAndVerifyRevision
-    displayName: 'Identify and Verify GitHub ChatGPT Revision'
+  - job: SynchronizeServiceRepository
+    displayName: 'Synchronize GitHub ChatGPT Source to ADO'
     pool:
       name: Linux x86 64bit
     steps:
@@ -100,7 +100,7 @@ jobs:
             cd "$WORKSPACE"
             git fetch --no-tags origin "$GITHUB_REF:refs/remotes/origin/chatgpt"
             git checkout --detach "$GITHUB_SHA"
-            ACTUAL_SHA="$(git rev-parse HEAD)"
+            ACTUAL_SHA=`git rev-parse HEAD`
             if [ "$ACTUAL_SHA" != "$GITHUB_SHA" ]; then
               echo "ERROR: Checked-out GitHub revision does not match webhook SHA."
               exit 1
@@ -149,12 +149,13 @@ jobs:
             if git diff --cached --quiet; then
               echo "ADO working tree already matches GitHub source."
               echo "##vso[task.setvariable variable=ADO_SYNC_CHANGED]false"
-              echo "##vso[task.setvariable variable=ADO_SYNC_SHA]$(git rev-parse HEAD)"
+              HEAD_SHA=`git rev-parse HEAD`
+              echo "##vso[task.setvariable variable=ADO_SYNC_SHA]$HEAD_SHA"
               exit 0
             fi
 
             git commit -m "Synchronize $SERVICE_NAME from GitHub chatgpt $GITHUB_SHA"
-            ADO_SHA="$(git rev-parse HEAD)"
+            ADO_SHA=`git rev-parse HEAD`
             git -c http.extraheader="AUTHORIZATION: bearer $SYSTEM_ACCESSTOKEN" push origin "HEAD:refs/heads/$ADO_BRANCH"
             echo "GitHub SHA: $GITHUB_SHA"
             echo "ADO SHA:    $ADO_SHA"
