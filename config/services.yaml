@@ -1,0 +1,20 @@
+services:
+  edge-controller:
+    repository: troy-cichosz/edge-controller
+    development_branch: chatgpt
+
+  edge-time:
+    repository: troy-cichosz/edge-time
+    development_branch: chatgpt
+
+  edge-gps:
+    repository: troy-cichosz/edge-gps
+    development_branch: chatgpt
+
+  edge-video:
+    repository: troy-cichosz/edge-video
+    development_branch: chatgpt
+
+  edge-audio:
+    repository: troy-cichosz/edge-audio
+    development_branch: chatgpt
