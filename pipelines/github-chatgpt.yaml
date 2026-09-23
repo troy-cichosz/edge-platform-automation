@@ -1,0 +1,129 @@
+trigger: none
+pr: none
+
+resources:
+  webhooks:
+    - webhook: GitHubPush
+      connection: edge-platform-github-chatgpt
+
+pool:
+  name: Linux x86 64bit
+
+variables:
+  - group: GitHub
+
+jobs:
+  - job: IdentifyAndVerifyRevision
+    displayName: 'Identify and Verify GitHub ChatGPT Revision'
+    pool:
+      name: Linux x86 64bit
+    steps:
+      - checkout: self
+        clean: true
+
+      - task: InstallSSHKey@0
+        displayName: 'Configure GitHub SSH Access'
+        inputs:
+          knownHostsEntry: '$(known_hosts_entry)'
+          sshPublicKey: '$(git_pk)'
+          sshKeySecureFile: '$(secFile)'
+
+      - task: Bash@3
+        displayName: 'Display Complete Webhook Payload'
+        inputs:
+          targetType: inline
+          script: |
+            set -euo pipefail
+            echo "ADO Build ID: $(Build.BuildId)"
+            echo "Source Branch: $(Build.SourceBranch)"
+            echo "Source Version: $(Build.SourceVersion)"
+            echo "Complete GitHub webhook payload:"
+            echo '${{ convertToJson(parameters.GitHubPush) }}'
+
+      - task: Bash@3
+        displayName: 'Validate GitHub Push'
+        env:
+          GITHUB_REPOSITORY: ${{ parameters.GitHubPush.repository.full_name }}
+          GITHUB_REF: ${{ parameters.GitHubPush.ref }}
+          GITHUB_SHA: ${{ parameters.GitHubPush.after }}
+        inputs:
+          targetType: inline
+          script: |
+            set -euo pipefail
+            echo "Repository: $GITHUB_REPOSITORY"
+            echo "Ref:        $GITHUB_REF"
+            echo "SHA:        $GITHUB_SHA"
+            if [ -z "$GITHUB_REPOSITORY" ]; then echo "ERROR: GitHub repository was not supplied by the webhook."; exit 1; fi
+            if [ -z "$GITHUB_REF" ]; then echo "ERROR: GitHub ref was not supplied by the webhook."; exit 1; fi
+            if [ -z "$GITHUB_SHA" ]; then echo "ERROR: GitHub commit SHA was not supplied by the webhook."; exit 1; fi
+            case "$GITHUB_REPOSITORY" in
+              troy-cichosz/edge-controller) SERVICE_NAME="edge-controller" ;;
+              troy-cichosz/edge-time) SERVICE_NAME="edge-time" ;;
+              troy-cichosz/edge-gps) SERVICE_NAME="edge-gps" ;;
+              troy-cichosz/edge-video) SERVICE_NAME="edge-video" ;;
+              troy-cichosz/edge-audio) SERVICE_NAME="edge-audio" ;;
+              *) echo "ERROR: Unsupported GitHub repository: $GITHUB_REPOSITORY"; exit 1 ;;
+            esac
+            if [ "$GITHUB_REF" != "refs/heads/chatgpt" ]; then echo "ERROR: Unsupported GitHub ref: $GITHUB_REF"; exit 1; fi
+            echo "Service: $SERVICE_NAME"
+            echo "##vso[task.setvariable variable=SERVICE_NAME]$SERVICE_NAME"
+            echo "##vso[task.setvariable variable=GITHUB_REPOSITORY]$GITHUB_REPOSITORY"
+            echo "##vso[task.setvariable variable=GITHUB_REF]$GITHUB_REF"
+            echo "##vso[task.setvariable variable=GITHUB_SHA]$GITHUB_SHA"
+
+      - task: Bash@3
+        displayName: 'Fetch Exact GitHub Revision'
+        env:
+          GITHUB_REPOSITORY: $(GITHUB_REPOSITORY)
+          GITHUB_REF: $(GITHUB_REF)
+          GITHUB_SHA: $(GITHUB_SHA)
+        inputs:
+          targetType: inline
+          script: |
+            set -euo pipefail
+            WORKSPACE="$(Pipeline.Workspace)/github-source"
+            SSH_DIR="${HOME}/.ssh"
+            KNOWN_HOSTS="${SSH_DIR}/github_known_hosts"
+            rm -rf "$WORKSPACE"
+            mkdir -p "$WORKSPACE" "$SSH_DIR"
+            cat > "$KNOWN_HOSTS" <<'EOF'
+            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+            EOF
+            chmod 600 "$KNOWN_HOSTS"
+            export GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=${KNOWN_HOSTS} -o StrictHostKeyChecking=yes"
+            git clone --no-tags "git@github.com:${GITHUB_REPOSITORY}.git" "$WORKSPACE"
+            cd "$WORKSPACE"
+            git fetch --no-tags origin "${GITHUB_REF}:refs/remotes/origin/chatgpt"
+            git checkout --detach "$GITHUB_SHA"
+            ACTUAL_SHA="$(git rev-parse HEAD)"
+            echo "Expected SHA: $GITHUB_SHA"
+            echo "Actual SHA:   $ACTUAL_SHA"
+            if [ "$ACTUAL_SHA" != "$GITHUB_SHA" ]; then echo "ERROR: Checked-out revision does not match webhook SHA."; exit 1; fi
+            echo "GitHub revision verified successfully."
+            echo "##vso[task.setvariable variable=GITHUB_SOURCE_PATH]$WORKSPACE"
+
+      - task: Bash@3
+        displayName: 'Record Revision Verification'
+        env:
+          GITHUB_REPOSITORY: $(GITHUB_REPOSITORY)
+          GITHUB_REF: $(GITHUB_REF)
+          GITHUB_SHA: $(GITHUB_SHA)
+          GITHUB_SOURCE_PATH: $(GITHUB_SOURCE_PATH)
+          SERVICE_NAME: $(SERVICE_NAME)
+        inputs:
+          targetType: inline
+          script: |
+            set -euo pipefail
+            echo "GitHub revision verification complete."
+            echo "Service:     $SERVICE_NAME"
+            echo "Repository:  $GITHUB_REPOSITORY"
+            echo "Ref:         $GITHUB_REF"
+            echo "SHA:         $GITHUB_SHA"
+            echo "Source path: $GITHUB_SOURCE_PATH"
+
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish Verified GitHub Source'
+        inputs:
+          PathtoPublish: '$(GITHUB_SOURCE_PATH)'
+          ArtifactName: 'github-source'
+          publishLocation: 'Container'
