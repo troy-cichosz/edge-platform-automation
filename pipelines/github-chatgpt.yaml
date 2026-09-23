@@ -6,6 +6,27 @@ resources:
     - webhook: GitHubPush
       connection: edge-platform-github-chatgpt
 
+  repositories:
+    - repository: edgeController
+      type: git
+      name: Docker/edge-controller
+
+    - repository: edgeTime
+      type: git
+      name: Docker/edge-time
+
+    - repository: edgeGps
+      type: git
+      name: Docker/edge-gps
+
+    - repository: edgeVideo
+      type: git
+      name: Docker/edge-video
+
+    - repository: edgeAudio
+      type: git
+      name: Docker/edge-audio
+
 pool:
   name: Linux x86 64bit
 
@@ -17,6 +38,13 @@ jobs:
     displayName: 'Synchronize GitHub ChatGPT Source to ADO'
     pool:
       name: Linux x86 64bit
+    uses:
+      repositories:
+        - edgeController
+        - edgeTime
+        - edgeGps
+        - edgeVideo
+        - edgeAudio
     steps:
       - checkout: self
         clean: true
