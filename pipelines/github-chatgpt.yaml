@@ -10,22 +10,27 @@ resources:
     - repository: edgeController
       type: git
       name: Docker/edge-controller
+      ref: refs/heads/chatgpt
 
     - repository: edgeTime
       type: git
       name: Docker/edge-time
+      ref: refs/heads/chatgpt
 
     - repository: edgeGps
       type: git
       name: Docker/edge-gps
+      ref: refs/heads/chatgpt
 
     - repository: edgeVideo
       type: git
       name: Docker/edge-video
+      ref: refs/heads/chatgpt
 
     - repository: edgeAudio
       type: git
       name: Docker/edge-audio
+      ref: refs/heads/chatgpt
 
 pool:
   name: Linux x86 64bit
@@ -134,35 +139,60 @@ jobs:
               exit 1
             fi
 
+      - checkout: edgeController
+        displayName: 'Checkout ADO edge-controller chatgpt'
+        path: ado-edge-controller
+        clean: true
+        persistCredentials: true
+        condition: and(succeeded(), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-controller'))
+
+      - checkout: edgeTime
+        displayName: 'Checkout ADO edge-time chatgpt'
+        path: ado-edge-time
+        clean: true
+        persistCredentials: true
+        condition: and(succeeded(), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-time'))
+
+      - checkout: edgeGps
+        displayName: 'Checkout ADO edge-gps chatgpt'
+        path: ado-edge-gps
+        clean: true
+        persistCredentials: true
+        condition: and(succeeded(), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-gps'))
+
+      - checkout: edgeVideo
+        displayName: 'Checkout ADO edge-video chatgpt'
+        path: ado-edge-video
+        clean: true
+        persistCredentials: true
+        condition: and(succeeded(), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-video'))
+
+      - checkout: edgeAudio
+        displayName: 'Checkout ADO edge-audio chatgpt'
+        path: ado-edge-audio
+        clean: true
+        persistCredentials: true
+        condition: and(succeeded(), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-audio'))
+
       - task: Bash@3
         displayName: 'Synchronize Matching ADO Repository'
         env:
           GITHUB_SHA: $(GITHUB_SHA)
           SERVICE_NAME: $(SERVICE_NAME)
-          SYSTEM_ACCESSTOKEN: $(System.AccessToken)
         inputs:
           targetType: inline
           script: |
             set -euo pipefail
-            if [ -z "$SYSTEM_ACCESSTOKEN" ]; then
-              echo "ERROR: System.AccessToken is not available."
-              exit 1
-            fi
 
-            ADO_PROJECT="Docker"
-            ADO_REPOSITORY="$SERVICE_NAME"
             ADO_BRANCH="chatgpt"
-            ADO_REPOSITORY_URL="$(System.TeamFoundationCollectionUri)$ADO_PROJECT/_git/$ADO_REPOSITORY"
             SOURCE_PATH="$(Pipeline.Workspace)/github-source"
             ADO_PATH="$(Pipeline.Workspace)/ado-$SERVICE_NAME"
 
-            # Use Git's --config-env form so the OAuth header is supplied to Git
-            # without embedding the token in the command line.
-            export ADO_AUTH_HEADER="Authorization: Bearer $SYSTEM_ACCESSTOKEN"
-            export GIT_TERMINAL_PROMPT=0
+            if [ ! -d "$ADO_PATH/.git" ]; then
+              echo "ERROR: Expected ADO checkout was not found: $ADO_PATH"
+              exit 1
+            fi
 
-            rm -rf "$ADO_PATH"
-            git --config-env=http.extraheader=ADO_AUTH_HEADER clone "$ADO_REPOSITORY_URL" "$ADO_PATH"
             cd "$ADO_PATH"
             git fetch origin --prune
 
@@ -189,7 +219,7 @@ jobs:
 
             git commit -m "Synchronize $SERVICE_NAME from GitHub chatgpt $GITHUB_SHA"
             ADO_SHA=`git rev-parse HEAD`
-            git --config-env=http.extraheader=ADO_AUTH_HEADER push origin "HEAD:refs/heads/$ADO_BRANCH"
+            git push origin "HEAD:refs/heads/$ADO_BRANCH"
             echo "GitHub SHA: $GITHUB_SHA"
             echo "ADO SHA:    $ADO_SHA"
             echo "##vso[task.setvariable variable=ADO_SYNC_CHANGED]true"
