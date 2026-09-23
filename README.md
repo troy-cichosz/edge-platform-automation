@@ -69,7 +69,7 @@ It does not:
 
 For `build_service` repositories, the synchronized ADO `chatgpt` branch continues into the existing service CI/CD.
 
-For `sync_only` repositories, the synchronized ADO `chatgpt` branch triggers the repository's `chatgpt-pipelines.yaml` public-maintenance pipeline. That downstream pipeline performs the existing-style ADO-to-GitHub `public` maintenance operation.
+For `sync_only` repositories, the synchronized ADO `chatgpt` branch triggers the repository's `azure-pipelines.yaml` public-maintenance pipeline. That downstream pipeline performs the existing-style ADO-to-GitHub `public` maintenance operation.
 
 The `edge-platform-automation` public push can generate another GitHub webhook event, but the automation pipeline accepts only `chatgpt` events. This is the explicit recursion boundary.
 
@@ -86,7 +86,7 @@ The `edge-platform-automation` public push can generate another GitHub webhook e
 
 **Increment C — Expand and harden GitHub → ADO synchronization**
 
-Implementation has been added on `chatgpt`. Runtime/ADO verification remains required before marking the increment complete.
+The expanded implementation is running across all seven covered repositories. Targeted hardening verification remains before marking the increment complete.
 
 Next verification should cover:
 
