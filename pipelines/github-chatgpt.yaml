@@ -140,7 +140,7 @@ jobs:
               git rm -rf . >/dev/null 2>&1 || true
             fi
 
-            find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+            find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
             cp -a "$SOURCE_PATH"/. "$ADO_PATH"/
             git config user.name "edge-platform-automation"
             git config user.email "edge-platform-automation@spoocannon.com"
