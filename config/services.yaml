@@ -2,28 +2,52 @@ defaults:
   ado_project: Docker
   development_branch: chatgpt
 
-services:
+repositories:
   edge-controller:
     repository: troy-cichosz/edge-controller
     ado_repository: edge-controller
+    class: build_service
     ado_pipeline: edge-controller - CI
+    public_maintenance: existing_service_ci
 
   edge-time:
     repository: troy-cichosz/edge-time
     ado_repository: edge-time
+    class: build_service
     ado_pipeline: edge-time - CI
+    public_maintenance: existing_service_ci
 
   edge-gps:
     repository: troy-cichosz/edge-gps
     ado_repository: edge-gps
+    class: build_service
     ado_pipeline: edge-gps - CI
+    public_maintenance: existing_service_ci
 
   edge-video:
     repository: troy-cichosz/edge-video
     ado_repository: edge-video
+    class: build_service
     ado_pipeline: edge-video - CI
+    public_maintenance: existing_service_ci
 
   edge-audio:
     repository: troy-cichosz/edge-audio
     ado_repository: edge-audio
+    class: build_service
     ado_pipeline: edge-audio - CI
+    public_maintenance: existing_service_ci
+
+  ai-legal-platform-development:
+    repository: troy-cichosz/ai-legal-platform-development
+    ado_repository: ai-legal-platform-development
+    class: sync_only
+    ado_pipeline: sync-only-public-maintenance
+    public_maintenance: sync_only
+
+  edge-platform-automation:
+    repository: troy-cichosz/edge-platform-automation
+    ado_repository: edge-platform-automation
+    class: sync_only
+    ado_pipeline: sync-only-public-maintenance
+    public_maintenance: sync_only
