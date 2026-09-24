@@ -1,6 +1,20 @@
 trigger: none
 pr: none
 
+parameters:
+  - name: manualRepository
+    displayName: 'Manual GitHub repository (owner/name)'
+    type: string
+    default: ''
+  - name: manualRef
+    displayName: 'Manual GitHub ref'
+    type: string
+    default: 'refs/heads/chatgpt'
+  - name: manualSha
+    displayName: 'Manual GitHub commit SHA'
+    type: string
+    default: ''
+
 resources:
   webhooks:
     - webhook: GitHubPush
@@ -90,8 +104,16 @@ jobs:
             GITHUB_REF='${{ parameters.GitHubPush.ref }}'
             GITHUB_SHA='${{ parameters.GitHubPush.after }}'
 
+            if [ -z "$GITHUB_REPOSITORY" ]; then
+              GITHUB_REPOSITORY='${{ parameters.manualRepository }}'
+              GITHUB_REF='${{ parameters.manualRef }}'
+              GITHUB_SHA='${{ parameters.manualSha }}'
+              echo "Manual execution detected; using supplied repository/ref/SHA."
+            fi
+
             if [ -z "$GITHUB_REPOSITORY" ] || [ -z "$GITHUB_REF" ] || [ -z "$GITHUB_SHA" ]; then
               echo "ERROR: GitHub repository, ref, and SHA are required."
+              echo "For a manual run, provide manualRepository, manualRef, and manualSha."
               exit 1
             fi
 
