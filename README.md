@@ -86,18 +86,21 @@ The `edge-platform-automation` public push can generate another GitHub webhook e
 
 **Increment C — Expand and harden GitHub → ADO synchronization**
 
-The expanded implementation is running across all seven covered repositories. Targeted hardening verification remains before marking the increment complete.
+The expanded implementation has been validated across all seven covered repositories.
 
-Next verification should cover:
+Validated behavior:
 
-1. ADO mirrors for all seven repositories.
-2. A controlled `chatgpt` push for each repository.
-3. Existing service CI triggers for all five build services.
-4. Sync-only public maintenance for both control-plane repositories.
-5. Complete-tree deletion propagation.
-6. Idempotent synchronization.
-7. Non-`chatgpt` no-op behavior.
-8. `edge-platform-automation` recursion boundary.
-9. GitHub SHA → ADO synchronization SHA correlation.
+1. All seven repositories are registered with the intended `build_service` or `sync_only` classification.
+2. Exact GitHub `chatgpt` SHA synchronization was validated across the full registry.
+3. Idempotent synchronization was validated; unchanged source does not create unnecessary ADO commits.
+4. Complete-tree deletion propagation was validated.
+5. Non-`chatgpt` GitHub webhook events were validated as harmless no-ops.
+6. The `edge-platform-automation` recursion boundary was validated; `public` events are not accepted by the `chatgpt)-only synchronization pipeline.
+7. GitHub SHA → ADO synchronization SHA correlation was validated.
+8. A controlled `edge-audio` `chatgpt` change verified the changed-source downstream path through ADO synchronization, existing ADO CI/CD, and GitHub `public` maintenance.
+
+The synchronization control plane is validated for the current seven-repository registry. Existing service CI/CD definitions remain unchanged.
+
+Future work is tracked in the later development-process phases.
 
 Existing service CI/CD definitions remain unchanged.
