@@ -251,7 +251,7 @@ jobs:
             fi
 
             cd "$ADO_PATH"
-            git fetch origin --prune
+            git -c http.extraheader="AUTHORIZATION: bearer $(System.AccessToken)" fetch origin --prune
             if git show-ref --verify --quiet "refs/remotes/origin/$ADO_BRANCH"; then
               git checkout -B "$ADO_BRANCH" "origin/$ADO_BRANCH"
             else
@@ -275,7 +275,7 @@ jobs:
 
             git commit -m "Synchronize $REPOSITORY_NAME from GitHub chatgpt $GITHUB_SHA"
             ADO_SHA="$(git rev-parse HEAD)"
-            git push origin "HEAD:refs/heads/$ADO_BRANCH"
+            git -c http.extraheader="AUTHORIZATION: bearer $(System.AccessToken)" push origin "HEAD:refs/heads/$ADO_BRANCH"
 
             REMOTE_ADO_SHA="$(git ls-remote origin "refs/heads/$ADO_BRANCH" | cut -f1)"
             if [ "$REMOTE_ADO_SHA" != "$ADO_SHA" ]; then
