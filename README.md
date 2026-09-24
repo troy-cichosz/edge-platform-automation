@@ -32,7 +32,7 @@ GitHub `chatgpt` is authoritative for source and history. ADO `chatgpt` branches
 
 ## Repository classes
 
-The automation registry covers all seven current project repositories:
+The automation registry covers all eight current project repositories:
 
 | Repository | Class | Downstream behavior |
 |---|---|---|
@@ -43,6 +43,7 @@ The automation registry covers all seven current project repositories:
 | `edge-audio` | `build_service` | Existing service CI/CD |
 | `ai-legal-platform-development` | `sync_only` | Public-maintenance pipeline |
 | `edge-platform-automation` | `sync_only` | Public-maintenance pipeline |
+| `edge-ai` | `sync_only` | Public-maintenance pipeline |
 
 Synchronization is complete-tree: files deleted from GitHub `chatgpt` are removed from the ADO mirror.
 
@@ -86,7 +87,7 @@ The `edge-platform-automation` public push can generate another GitHub webhook e
 
 **Increment C — Expand and harden GitHub → ADO synchronization**
 
-The expanded implementation has been validated across all seven covered repositories.
+The expanded implementation has been validated across the original seven covered repositories. `edge-ai` is now registered as the eighth repository and will follow the same GitHub `chatgpt` → ADO `chatgpt` synchronization boundary.
 
 Validated behavior:
 
@@ -99,6 +100,6 @@ Validated behavior:
 7. GitHub SHA → ADO synchronization SHA correlation was validated.
 8. A controlled `edge-audio` `chatgpt` change verified the changed-source downstream path through ADO synchronization, existing ADO CI/CD, and GitHub `public` maintenance.
 
-The synchronization control plane is validated for the current seven-repository registry. Existing service CI/CD definitions remain unchanged.
+The synchronization control plane is validated for the original seven-repository registry. The `edge-ai` registration is a configuration extension and requires a controlled webhook/ADO validation after its ADO `chatgpt` branch is populated. Existing service CI/CD definitions remain unchanged.
 
 Future work is tracked in the later development-process phases.
