@@ -49,6 +49,10 @@ resources:
       type: git
       name: Docker/edge-platform-automation
       ref: refs/heads/chatgpt
+    - repository: edgeAi
+      type: git
+      name: Docker/edge-ai
+      ref: refs/heads/chatgpt
 
 pool:
   name: Linux x86 64bit
@@ -70,6 +74,7 @@ jobs:
         - edgeAudio
         - aiLegalPlatformDevelopment
         - edgePlatformAutomation
+        - edgeAi
     steps:
       - checkout: self
         clean: true
@@ -125,6 +130,7 @@ jobs:
               troy-cichosz/edge-audio) REPOSITORY_NAME="edge-audio"; REPOSITORY_CLASS="build_service" ;;
               troy-cichosz/ai-legal-platform-development) REPOSITORY_NAME="ai-legal-platform-development"; REPOSITORY_CLASS="sync_only" ;;
               troy-cichosz/edge-platform-automation) REPOSITORY_NAME="edge-platform-automation"; REPOSITORY_CLASS="sync_only" ;;
+              troy-cichosz/edge-ai) REPOSITORY_NAME="edge-ai"; REPOSITORY_CLASS="sync_only" ;;
               *) echo "ERROR: Unsupported GitHub repository: $GITHUB_REPOSITORY"; exit 1 ;;
             esac
 
@@ -215,6 +221,11 @@ jobs:
         clean: true
         persistCredentials: true
         condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-platform-automation'))
+      - checkout: edgeAi
+        path: ado-edge-ai
+        clean: true
+        persistCredentials: true
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-ai'))
 
       - task: Bash@3
         displayName: 'Preflight Required Build Pipeline Definition'
