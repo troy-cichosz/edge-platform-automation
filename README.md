@@ -102,5 +102,3 @@ Validated behavior:
 The synchronization control plane is validated for the current seven-repository registry. Existing service CI/CD definitions remain unchanged.
 
 Future work is tracked in the later development-process phases.
-
-Existing service CI/CD definitions remain unchanged.
