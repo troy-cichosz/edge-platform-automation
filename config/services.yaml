@@ -51,3 +51,10 @@ repositories:
     class: sync_only
     ado_pipeline: sync-only-public-maintenance
     public_maintenance: sync_only
+
+  edge-ai:
+    repository: troy-cichosz/edge-ai
+    ado_repository: edge-ai
+    class: sync_only
+    ado_pipeline: sync-only-public-maintenance
+    public_maintenance: sync_only
