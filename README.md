@@ -85,9 +85,9 @@ The `edge-platform-automation` public push can generate another GitHub webhook e
 
 ## Current increment
 
-**Increment C — Expand and harden GitHub → ADO synchronization**
+**Increment C - Expand and harden GitHub -> ADO synchronization**
 
-The expanded implementation has been validated across the original seven covered repositories. `edge-ai` is now registered as the eighth repository and will follow the same GitHub `chatgpt` → ADO `chatgpt` synchronization boundary.
+The expanded implementation has been validated across the original seven covered repositories. `edge-ai` is now registered as the eighth repository and will follow the same GitHub `chatgpt` -> ADO `chatgpt` synchronization boundary.
 
 Validated behavior:
 
@@ -97,7 +97,7 @@ Validated behavior:
 4. Complete-tree deletion propagation was validated.
 5. Non-`chatgpt` GitHub webhook events were validated as harmless no-ops.
 6. The `edge-platform-automation` recursion boundary was validated; `public` events are not accepted by the `chatgpt)-only synchronization pipeline.
-7. GitHub SHA → ADO synchronization SHA correlation was validated.
+7. GitHub SHA -> ADO synchronization SHA correlation was validated.
 8. A controlled `edge-audio` `chatgpt` change verified the changed-source downstream path through ADO synchronization, existing ADO CI/CD, and GitHub `public` maintenance.
 
 The synchronization control plane is validated for the original seven-repository registry. The `edge-ai` registration is a configuration extension and requires a controlled webhook/ADO validation after its ADO `chatgpt` branch is populated. Existing service CI/CD definitions remain unchanged.
