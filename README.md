@@ -83,6 +83,14 @@ The `edge-platform-automation` public push can generate another GitHub webhook e
 - Secrets and credentials must never be committed to this repository.
 - OAuth tokens and other credentials must never be echoed to logs.
 
+## Local Development-Agent Boundary
+
+Local coding-agent framework qualification and repository implementation occur before a vetted GitHub `chatgpt` source change enters this automation control plane.
+
+This repository does not select local AI models, execute coding agents, or replace independent development validation. Its responsibility begins with the GitHub `chatgpt` webhook and continues through source synchronization into ADO and the existing downstream CI/CD or public-maintenance path.
+
+The local development-agent process must establish repository scope, validation, and human acceptance before a change is treated as vetted source for this automation workflow.
+
 ## Current increment
 
 **Increment C - Expand and harden GitHub -> ADO synchronization**
