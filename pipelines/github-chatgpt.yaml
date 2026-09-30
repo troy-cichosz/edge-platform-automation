@@ -1,0 +1,326 @@
+trigger: none
+pr: none
+
+parameters:
+  - name: manualRepository
+    displayName: 'Manual GitHub repository (owner/name)'
+    type: string
+    default: ''
+  - name: manualRef
+    displayName: 'Manual GitHub ref'
+    type: string
+    default: 'refs/heads/chatgpt'
+  - name: manualSha
+    displayName: 'Manual GitHub commit SHA'
+    type: string
+    default: ''
+
+resources:
+  webhooks:
+    - webhook: GitHubPush
+      connection: edge-platform-github-chatgpt
+
+  repositories:
+    - repository: edgeController
+      type: git
+      name: Docker/edge-controller
+      ref: refs/heads/chatgpt
+    - repository: edgeTime
+      type: git
+      name: Docker/edge-time
+      ref: refs/heads/chatgpt
+    - repository: edgeGps
+      type: git
+      name: Docker/edge-gps
+      ref: refs/heads/chatgpt
+    - repository: edgeVideo
+      type: git
+      name: Docker/edge-video
+      ref: refs/heads/chatgpt
+    - repository: edgeAudio
+      type: git
+      name: Docker/edge-audio
+      ref: refs/heads/chatgpt
+    - repository: aiLegalPlatformDevelopment
+      type: git
+      name: Docker/ai-legal-platform-development
+      ref: refs/heads/chatgpt
+    - repository: edgePlatformAutomation
+      type: git
+      name: Docker/edge-platform-automation
+      ref: refs/heads/chatgpt
+    - repository: edgeAi
+      type: git
+      name: Docker/edge-ai
+      ref: refs/heads/chatgpt
+
+pool:
+  name: Linux x86 64bit
+
+variables:
+  - group: GitHub
+
+jobs:
+  - job: SynchronizeRepository
+    displayName: 'Synchronize GitHub ChatGPT Source to ADO'
+    pool:
+      name: Linux x86 64bit
+    uses:
+      repositories:
+        - edgeController
+        - edgeTime
+        - edgeGps
+        - edgeVideo
+        - edgeAudio
+        - aiLegalPlatformDevelopment
+        - edgePlatformAutomation
+        - edgeAi
+    steps:
+      - checkout: self
+        clean: true
+
+      - task: InstallSSHKey@0
+        displayName: 'Configure GitHub SSH Access'
+        inputs:
+          knownHostsEntry: '$(known_hosts_entry)'
+          sshPublicKey: '$(git_pk)'
+          sshKeySecureFile: '$(secFile)'
+
+      - task: Bash@3
+        displayName: 'Display Complete Webhook Payload'
+        inputs:
+          targetType: inline
+          script: |
+            set -euo pipefail
+            echo "ADO Build ID: $(Build.BuildId)"
+            echo "Source Branch: $(Build.SourceBranch)"
+            echo "Source Version: $(Build.SourceVersion)"
+            echo "Complete GitHub webhook payload:"
+            echo '${{ convertToJson(parameters.GitHubPush) }}'
+
+      - task: Bash@3
+        displayName: 'Validate GitHub Push'
+        inputs:
+          targetType: inline
+          script: |
+            set -euo pipefail
+
+            GITHUB_REPOSITORY='${{ parameters.GitHubPush.repository.full_name }}'
+            GITHUB_REF='${{ parameters.GitHubPush.ref }}'
+            GITHUB_SHA='${{ parameters.GitHubPush.after }}'
+
+            if [ -z "$GITHUB_REPOSITORY" ]; then
+              GITHUB_REPOSITORY='${{ parameters.manualRepository }}'
+              GITHUB_REF='${{ parameters.manualRef }}'
+              GITHUB_SHA='${{ parameters.manualSha }}'
+              echo "Manual execution detected; using supplied repository/ref/SHA."
+            fi
+
+            if [ -z "$GITHUB_REPOSITORY" ] || [ -z "$GITHUB_REF" ] || [ -z "$GITHUB_SHA" ]; then
+              echo "ERROR: GitHub repository, ref, and SHA are required."
+              echo "For a manual run, provide manualRepository, manualRef, and manualSha."
+              exit 1
+            fi
+
+            case "$GITHUB_REPOSITORY" in
+              troy-cichosz/edge-controller) REPOSITORY_NAME="edge-controller"; REPOSITORY_CLASS="build_service" ;;
+              troy-cichosz/edge-time) REPOSITORY_NAME="edge-time"; REPOSITORY_CLASS="build_service" ;;
+              troy-cichosz/edge-gps) REPOSITORY_NAME="edge-gps"; REPOSITORY_CLASS="build_service" ;;
+              troy-cichosz/edge-video) REPOSITORY_NAME="edge-video"; REPOSITORY_CLASS="build_service" ;;
+              troy-cichosz/edge-audio) REPOSITORY_NAME="edge-audio"; REPOSITORY_CLASS="build_service" ;;
+              troy-cichosz/ai-legal-platform-development) REPOSITORY_NAME="ai-legal-platform-development"; REPOSITORY_CLASS="sync_only" ;;
+              troy-cichosz/edge-platform-automation) REPOSITORY_NAME="edge-platform-automation"; REPOSITORY_CLASS="sync_only" ;;
+              troy-cichosz/edge-ai) REPOSITORY_NAME="edge-ai"; REPOSITORY_CLASS="sync_only" ;;
+              *) echo "ERROR: Unsupported GitHub repository: $GITHUB_REPOSITORY"; exit 1 ;;
+            esac
+
+            echo "GitHub repository: $GITHUB_REPOSITORY"
+            echo "GitHub ref:        $GITHUB_REF"
+            echo "GitHub SHA:        $GITHUB_SHA"
+            echo "Repository class:  $REPOSITORY_CLASS"
+
+            echo "##vso[task.setvariable variable=GITHUB_REPOSITORY]$GITHUB_REPOSITORY"
+            echo "##vso[task.setvariable variable=GITHUB_REF]$GITHUB_REF"
+            echo "##vso[task.setvariable variable=GITHUB_SHA]$GITHUB_SHA"
+            echo "##vso[task.setvariable variable=REPOSITORY_NAME]$REPOSITORY_NAME"
+            echo "##vso[task.setvariable variable=REPOSITORY_CLASS]$REPOSITORY_CLASS"
+
+            if [ "$GITHUB_REF" != "refs/heads/chatgpt" ]; then
+              echo "Ignoring GitHub push because this automation only synchronizes the chatgpt branch."
+              echo "No ADO repository will be modified."
+              echo "##vso[task.setvariable variable=GITHUB_PUSH_ACCEPTED]false"
+              exit 0
+            fi
+
+            echo "Accepted GitHub chatgpt push for: $REPOSITORY_NAME"
+            echo "##vso[task.setvariable variable=GITHUB_PUSH_ACCEPTED]true"
+
+      - task: Bash@3
+        displayName: 'Fetch Exact GitHub ChatGPT Source'
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'))
+        env:
+          GITHUB_REPOSITORY: $(GITHUB_REPOSITORY)
+          GITHUB_REF: $(GITHUB_REF)
+          GITHUB_SHA: $(GITHUB_SHA)
+        inputs:
+          targetType: inline
+          script: |
+            set -euo pipefail
+            WORKSPACE="$(Pipeline.Workspace)/github-source"
+            SSH_DIR="$HOME/.ssh"
+            KNOWN_HOSTS="$SSH_DIR/github_known_hosts"
+            rm -rf "$WORKSPACE"
+            mkdir -p "$WORKSPACE" "$SSH_DIR"
+            cat > "$KNOWN_HOSTS" <<'EOF'
+            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+            EOF
+            chmod 600 "$KNOWN_HOSTS"
+            export GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=$KNOWN_HOSTS -o StrictHostKeyChecking=yes"
+            git clone --no-tags "git@github.com:$GITHUB_REPOSITORY.git" "$WORKSPACE"
+            cd "$WORKSPACE"
+            git fetch --no-tags origin "$GITHUB_REF:refs/remotes/origin/chatgpt"
+            git checkout --detach "$GITHUB_SHA"
+            ACTUAL_SHA="$(git rev-parse HEAD)"
+            if [ "$ACTUAL_SHA" != "$GITHUB_SHA" ]; then
+              echo "ERROR: Checked-out GitHub revision does not match webhook SHA."
+              exit 1
+            fi
+
+      - checkout: edgeController
+        path: ado-edge-controller
+        clean: true
+        persistCredentials: true
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-controller'))
+      - checkout: edgeTime
+        path: ado-edge-time
+        clean: true
+        persistCredentials: true
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-time'))
+      - checkout: edgeGps
+        path: ado-edge-gps
+        clean: true
+        persistCredentials: true
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-gps'))
+      - checkout: edgeVideo
+        path: ado-edge-video
+        clean: true
+        persistCredentials: true
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-video'))
+      - checkout: edgeAudio
+        path: ado-edge-audio
+        clean: true
+        persistCredentials: true
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-audio'))
+      - checkout: aiLegalPlatformDevelopment
+        path: ado-ai-legal-platform-development
+        clean: true
+        persistCredentials: true
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/ai-legal-platform-development'))
+      - checkout: edgePlatformAutomation
+        path: ado-edge-platform-automation
+        clean: true
+        persistCredentials: true
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-platform-automation'))
+      - checkout: edgeAi
+        path: ado-edge-ai
+        clean: true
+        persistCredentials: true
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq('${{ parameters.GitHubPush.repository.full_name }}', 'troy-cichosz/edge-ai'))
+
+      - task: Bash@3
+        displayName: 'Preflight Required Build Pipeline Definition'
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'), eq(variables['REPOSITORY_CLASS'], 'build_service'))
+        inputs:
+          targetType: inline
+          script: |
+            set -euo pipefail
+            SOURCE_PATH="$(Pipeline.Workspace)/github-source"
+            if [ ! -f "$SOURCE_PATH/azure-pipelines.yaml" ]; then
+              echo "ERROR: Required azure-pipelines.yaml is missing from GitHub chatgpt."
+              echo "Refusing complete-tree synchronization for build_service."
+              exit 1
+            fi
+            echo "Verified required build-service CI definition: azure-pipelines.yaml"
+
+      - task: Bash@3
+        displayName: 'Synchronize Matching ADO Repository'
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'))
+        env:
+          GITHUB_SHA: $(GITHUB_SHA)
+          REPOSITORY_NAME: $(REPOSITORY_NAME)
+        inputs:
+          targetType: inline
+          script: |
+            set -euo pipefail
+            ADO_BRANCH="chatgpt"
+            SOURCE_PATH="$(Pipeline.Workspace)/github-source"
+            ADO_PATH="$(Pipeline.Workspace)/ado-$REPOSITORY_NAME"
+
+            if [ ! -d "$ADO_PATH/.git" ]; then
+              echo "ERROR: Expected ADO checkout was not found: $ADO_PATH"
+              exit 1
+            fi
+
+            cd "$ADO_PATH"
+            git -c http.extraheader="AUTHORIZATION: bearer $(System.AccessToken)" fetch origin --prune
+            if git show-ref --verify --quiet "refs/remotes/origin/$ADO_BRANCH"; then
+              git checkout -B "$ADO_BRANCH" "origin/$ADO_BRANCH"
+            else
+              git checkout --orphan "$ADO_BRANCH"
+              git rm -rf . >/dev/null 2>&1 || true
+            fi
+
+            find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} \;
+            find "$SOURCE_PATH" -mindepth 1 -maxdepth 1 ! -name .git -exec cp -a {} "$ADO_PATH"/ \;
+
+            git config user.name "edge-platform-automation"
+            git config user.email "edge-platform-automation@spoocannon.com"
+            git add --all
+
+            if git diff --cached --quiet; then
+              echo "ADO working tree already matches GitHub source."
+              echo "##vso[task.setvariable variable=ADO_SYNC_CHANGED]false"
+              echo "##vso[task.setvariable variable=ADO_SYNC_SHA]$(git rev-parse HEAD)"
+              exit 0
+            fi
+
+            git commit -m "Synchronize $REPOSITORY_NAME from GitHub chatgpt $GITHUB_SHA"
+            ADO_SHA="$(git rev-parse HEAD)"
+            git -c http.extraheader="AUTHORIZATION: bearer $(System.AccessToken)" push origin "HEAD:refs/heads/$ADO_BRANCH"
+
+            REMOTE_ADO_SHA="$(git ls-remote origin "refs/heads/$ADO_BRANCH" | cut -f1)"
+            if [ "$REMOTE_ADO_SHA" != "$ADO_SHA" ]; then
+              echo "ERROR: ADO branch verification failed."
+              exit 1
+            fi
+
+            echo "GitHub SHA:       $GITHUB_SHA"
+            echo "ADO SHA:          $ADO_SHA"
+            echo "Verified ADO SHA: $REMOTE_ADO_SHA"
+            echo "##vso[task.setvariable variable=ADO_SYNC_CHANGED]true"
+            echo "##vso[task.setvariable variable=ADO_SYNC_SHA]$ADO_SHA"
+
+      - task: Bash@3
+        displayName: 'Record Synchronization Result'
+        condition: and(succeeded(), eq(variables['GITHUB_PUSH_ACCEPTED'], 'true'))
+        env:
+          GITHUB_REPOSITORY: $(GITHUB_REPOSITORY)
+          GITHUB_SHA: $(GITHUB_SHA)
+          REPOSITORY_NAME: $(REPOSITORY_NAME)
+          REPOSITORY_CLASS: $(REPOSITORY_CLASS)
+          ADO_SYNC_CHANGED: $(ADO_SYNC_CHANGED)
+          ADO_SYNC_SHA: $(ADO_SYNC_SHA)
+        inputs:
+          targetType: inline
+          script: |
+            set -euo pipefail
+            echo "GitHub repository: $GITHUB_REPOSITORY"
+            echo "GitHub branch:     chatgpt"
+            echo "GitHub SHA:        $GITHUB_SHA"
+            echo "Repository class:  $REPOSITORY_CLASS"
+            echo "ADO project:       Docker"
+            echo "ADO repository:    $REPOSITORY_NAME"
+            echo "ADO branch:        chatgpt"
+            echo "ADO changed:       $ADO_SYNC_CHANGED"
+            echo "ADO sync SHA:      $ADO_SYNC_SHA"
+            echo "Synchronization stage complete."
