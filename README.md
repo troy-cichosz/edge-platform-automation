@@ -95,11 +95,11 @@ The local development-agent process must establish repository scope, validation,
 
 **Increment C - Expand and harden GitHub -> ADO synchronization**
 
-The expanded implementation has been validated across the original seven covered repositories. `edge-ai` is now registered as the eighth repository and will follow the same GitHub `chatgpt` -> ADO `chatgpt` synchronization boundary.
+The expanded implementation has been validated across all eight current project repositories, including the `edge-ai` `sync_only` registration. All registered repositories use the same GitHub `chatgpt` -> ADO `chatgpt` synchronization boundary.
 
 Validated behavior:
 
-1. All seven repositories are registered with the intended `build_service` or `sync_only` classification.
+1. All eight repositories are registered with the intended `build_service` or `sync_only` classification.
 2. Exact GitHub `chatgpt` SHA synchronization was validated across the full registry.
 3. Idempotent synchronization was validated; unchanged source does not create unnecessary ADO commits.
 4. Complete-tree deletion propagation was validated.
@@ -108,6 +108,6 @@ Validated behavior:
 7. GitHub SHA -> ADO synchronization SHA correlation was validated.
 8. A controlled `edge-audio` `chatgpt` change verified the changed-source downstream path through ADO synchronization, existing ADO CI/CD, and GitHub `public` maintenance.
 
-The synchronization control plane is validated for the original seven-repository registry. The `edge-ai` registration is a configuration extension and requires a controlled webhook/ADO validation after its ADO `chatgpt` branch is populated. Existing service CI/CD definitions remain unchanged.
+The synchronization control plane is validated across all eight current project repositories. Existing service CI/CD definitions remain unchanged.
 
 Future work is tracked in the later development-process phases.
